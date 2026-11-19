@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard</title>
+<script>
+/* Apply the saved theme before first paint to avoid a flash. */
+(function () {
+  var dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+  var t = dark ? 'dark' : 'light';
+  try {
+    var s = JSON.parse(localStorage.getItem('dash.v1') || '{}');
+    if (s.settings && (s.settings.theme === 'dark' || s.settings.theme === 'light')) t = s.settings.theme;
+  } catch (e) {}
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<style>
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --text: #1c2230; --muted: #667085;
+  --border: #dfe3ea; --accent: #2f6fed; --accent-soft: #e6eefd; --on-accent: #ffffff;
+  --danger: #d92d20; color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #121418; --surface: #1b1e24; --text: #e7e9ee; --muted: #9aa3b2;
+  --border: #2a2f39; --accent: #6b9bff; --accent-soft: #232c42; --on-accent: #0b1220;
+  --danger: #f97066; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.warn { background: var(--danger); color: #fff; padding: 8px 24px; font-size: 14px; }
+
+.topbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  max-width: 1200px; margin: 0 auto; padding: 20px 24px 8px; }
+.search { position: relative; flex: 1 1 440px; display: flex; align-items: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.search input { flex: 1; min-width: 0; border: 0; background: transparent; outline: 0; padding: 11px 12px; }
+.chip { border: 0; background: transparent; color: var(--muted); padding: 8px 12px; border-radius: 8px;
+  white-space: nowrap; }
+.chip:hover { color: var(--text); background: var(--accent-soft); }
+#modeBtn { border-right: 1px solid var(--border); border-radius: 10px 0 0 10px; min-width: 70px; }
+.search.web #modeBtn { color: var(--accent); font-weight: 600; }
+.engine-wrap { position: relative; }
+.dd { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; min-width: 200px; margin: 0; padding: 4px;
+  list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+.dd li { padding: 8px 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 16px; }
+.dd li.hi { background: var(--accent-soft); }
+.dd li.sep { margin-bottom: 4px; border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; }
+.dd li .tick { color: var(--accent); }
+
+.actions { display: flex; gap: 8px; }
+.btn { border: 1px solid var(--border); background: var(--surface); padding: 8px 12px; border-radius: 8px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.danger { color: var(--danger); }
+.btn.small { padding: 3px 8px; font-size: 13px; }
+.btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+
+main { max-width: 1200px; margin: 0 auto; padding: 4px 24px 72px; }
+.cat { margin-top: 24px; }
+.cat-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+.cat-head h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.cat-tools { display: flex; gap: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.tile-wrap { position: relative; min-width: 0; }
+.tile { display: flex; align-items: center; gap: 10px; padding: 10px 12px; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  color: inherit; text-decoration: none; }
+.tile:hover { border-color: var(--accent); }
+.tile.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.tile .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editing .tile { border-style: dashed; cursor: pointer; }
+.icon, .letter { width: 24px; height: 24px; flex: none; border-radius: 6px; }
+.letter { display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 600; }
+.x { position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; padding: 0; line-height: 1;
+  border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--danger); }
+.x:hover { border-color: var(--danger); }
+.add-tile { padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px; background: transparent; color: var(--muted); text-align: left; }
+.add-tile:hover { color: var(--accent); border-color: var(--accent); }
+.empty { color: var(--muted); padding: 32px 0; }
+.foot { margin-top: 32px; }
+
+dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text);
+  padding: 20px; width: min(440px, 92vw); }
+dialog.wide { width: min(600px, 94vw); max-height: 90vh; overflow: auto; }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+dialog h3 { margin: 0 0 14px; font-size: 17px; }
+dialog h4 { margin: 20px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+label { display: block; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+label input:not([type=checkbox]), label select { display: block; width: 100%; margin-top: 4px; padding: 9px 10px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+label.check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 15px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row.end { justify-content: flex-end; margin-top: 8px; }
+.err { color: var(--danger); font-size: 13px; margin: 0 0 8px; }
+.hint { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+.eng-list { list-style: none; margin: 0 0 10px; padding: 0; }
+.eng-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.eng-list .u { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.add-eng { display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; align-items: end; }
+.add-eng label { margin: 0; }
+table.keys { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.keys td { padding: 4px 0; vertical-align: top; }
+table.keys td:first-child { white-space: nowrap; padding-right: 16px; }
+kbd { background: var(--bg); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; font: 12px ui-monospace, Menlo, Consolas, monospace; }
+
+table.keys.sc td { white-space: normal; padding: 6px 12px 6px 0; vertical-align: middle; }
+table.keys.sc td:last-child { text-align: right; padding-right: 0; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; display: flex; gap: 14px; align-items: center;
+  background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+.toast button { background: none; border: 0; color: inherit; text-decoration: underline; padding: 0; }
+
+@media (max-width: 560px) {
+  .topbar, main { padding-left: 14px; padding-right: 14px; }
+  .add-eng { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="warn" class="warn" hidden>This browser is blocking local storage, so changes can't be saved. Use Settings &rarr; Export to back up your links.</div>
+
+<header class="topbar">
+  <div class="search" id="search">
+    <button class="chip" id="modeBtn" type="button" title="Switch between link filter and web search (Ctrl+Space)"></button>
+    <input id="q" type="text" autocomplete="off" spellcheck="false" aria-label="Search">
+    <div class="engine-wrap">
+      <button class="chip" id="engineBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Choose search engine (Ctrl+/)"></button>
+      <ul id="dd" class="dd" role="listbox" aria-label="Search engines" hidden></ul>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="addBtn" type="button">+ Link</button>
+    <button class="btn" id="editBtn" type="button" aria-pressed="false">Edit</button>
+    <button class="btn" id="setBtn" type="button">Settings</button>
+    <button class="btn" id="themeBtn" type="button" aria-label="Toggle dark mode" title="Toggle dark / light mode"></button>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<!-- Add / edit link -->
+<dialog id="linkDlg">
+  <form id="linkForm" method="dialog">
+    <h3 id="linkTitle">Add link</h3>
+    <label>Name <input id="lName" maxlength="60" autocomplete="off" placeholder="Optional, defaults to the site name"></label>
+    <label>Web address <input id="lUrl" required autocomplete="off" placeholder="example.com"></label>
+    <label>Category
+      <select id="lCatSel"></select>
+    </label>
+    <label id="lNewWrap" hidden>New category name <input id="lNewCat" maxlength="60" autocomplete="off"></label>
+    <p class="err" id="lErr" hidden></p>
+    <div class="row end">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Add / rename category -->
+<dialog id="catDlg">
+  <form id="catForm" method="dialog">
+    <h3 id="catTitle">Add category</h3>
+    <label>Name <input id="cName" required maxlength="60" autocomplete="off"></label>
+    <div class="row end">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Settings -->
+<dialog id="setDlg" class="wide">
+  <h3>Settings</h3>
+
+  <h4>Links</h4>
+  <label>When I click a link
+    <select id="sNewTab">
+      <option value="1">Open in a new tab</option>
+      <option value="0">Open in the current tab</option>
+    </select>
+  </label>
+  <label class="check"><input type="checkbox" id="sIcons"> Show website icons</label>
+  <label>Icon source
+    <select id="sIconSrc">
+      <option value="google">Google favicon service</option>
+      <option value="ddg">DuckDuckGo favicon service</option>
+    </select>
+  </label>
+  <p class="hint">Icons are fetched from the chosen service, which sees the domains of your links. Turn icons off to fetch nothing and show a letter instead.</p>
+
+  <h4>Search engines</h4>
+  <ul class="eng-list" id="engList"></ul>
+  <form id="engForm" class="add-eng">
+    <label>Name <input id="eName" required maxlength="40" autocomplete="off"></label>
+    <label>URL (use %s for the query) <input id="eUrl" required autocomplete="off" placeholder="https://example.com/search?q=%s"></label>
+    <button class="btn" type="submit">Add</button>
+  </form>
+  <p class="err" id="eErr" hidden></p>
+
+  <h4>Backup</h4>
+  <div class="row">
+    <button class="btn" type="button" id="exportBtn">Export JSON</button>
+    <button class="btn" type="button" id="importBtn">Import JSON</button>
+    <button class="btn danger" type="button" id="resetBtn">Reset to defaults</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </div>
+  <p class="hint">Your data lives in this browser's local storage for this file. Clearing site data or moving the file can lose it, so export a backup now and then.</p>
+
+  <h4>Keyboard shortcuts</h4>
+  <table class="keys sc" id="scTable"></table>
+  <p class="err" id="scErr" hidden></p>
+  <p class="hint">Click Change, then press the new keys. Each shortcut can use up to 3 keys, for example Ctrl + Shift + K (modifier keys count as keys). Some combinations are reserved by your browser or operating system and can't be captured by a web page.</p>
+  <div class="row"><button type="button" class="btn" id="resetScBtn">Reset shortcuts to default</button></div>
+  <table class="keys" style="margin-top:14px">
+    <tr><td><kbd>Enter</kbd></td><td>Open the highlighted link, or run the web search</td></tr>
+    <tr><td><kbd>Shift</kbd> + <kbd>Enter</kbd></td><td>Same, but in the opposite tab behaviour</td></tr>
+    <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Change the highlighted link while filtering, or move in the engine list</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Clear the search, then leave the search bar (or close the engine list)</td></tr>
+  </table>
+
+  <div class="row end"><button type="button" class="btn primary" data-close>Close</button></div>
+</dialog>
+
+<script>
+(() => {
+'use strict';
+
+const KEY = 'dash.v1';
+const $ = (s) => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-3);
+
+/* ---------- helpers ---------- */
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const k in (props || {})) {
+    const v = props[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c);
+  return el;
+}
+
+function normUrl(v) {
+  v = String(v || '').trim();
+  if (!v) return null;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) v = 'https://' + v;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.href;
+  } catch (e) { return null; }
+}
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u; } };
+const hue = (s) => { let n = 0; for (const ch of s) n = (n * 31 + ch.charCodeAt(0)) % 360; return `hsl(${n} 45% 42%)`; };
+
+/* ---------- data ---------- */
+const DEFAULT_ENGINES = () => [
+  { id: 'google', name: 'Google', url: 'https://www.google.com/search?q=%s' },
+  { id: 'bing', name: 'Bing', url: 'https://www.bing.com/search?q=%s' },
+  { id: 'ddg', name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=%s' },
+];
+
+/* Keyboard shortcuts: a combo is modifiers + one key, at most 3 keys in total. */
+const MOD_ORDER = ['ctrl', 'alt', 'shift', 'meta'];
+const MOD_LABEL = { ctrl: 'Ctrl', alt: 'Alt', shift: 'Shift', meta: 'Meta' };
+const KEY_LABEL = { ' ': 'Space', Escape: 'Esc', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+const SC_ACTIONS = [
+  { id: 'focus', label: 'Focus the search bar' },
+  { id: 'engines', label: 'Open the search engine list' },
+  { id: 'mode', label: 'Switch between link filter and web search' },
+];
+const DEFAULT_SHORTCUTS = () => ({
+  focus: { mods: [], key: '/' },
+  engines: { mods: ['ctrl'], key: '/' },
+  mode: { mods: ['ctrl'], key: ' ' },
+});
+const keyLabel = (k) => KEY_LABEL[k] || (k.length === 1 ? k.toUpperCase() : k);
+const comboParts = (b) => [...b.mods.map((m) => MOD_LABEL[m]), keyLabel(b.key)];
+const fmtText = (b) => comboParts(b).join('+');
+function validShortcut(b) {
+  return !!b && Array.isArray(b.mods) && typeof b.key === 'string' && b.key.length > 0
+    && b.mods.every((m) => MOD_ORDER.includes(m)) && new Set(b.mods).size + 1 <= 3;
+}
+function matchKey(e, b) {
+  if (!b) return false;
+  const has = (m) => b.mods.includes(m);
+  if (e.ctrlKey !== has('ctrl') || e.altKey !== has('alt') || e.metaKey !== has('meta')) return false;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (!(k === b.key || (b.code && e.code === b.code))) return false;
+  if (e.shiftKey === has('shift')) return true;
+  // Shift may only be needed to type the symbol itself on this keyboard layout (e.g. "/" on some layouts)
+  return e.shiftKey && !has('shift') && k === b.key && k.length === 1 && !/[a-z0-9\s]/i.test(k);
+}
+
+function defaultState() {
+  const L = (name, url) => ({ id: uid(), name, url });
+  const C = (name, links) => ({ id: uid(), name, links });
+  return {
+    categories: [
+      C('Search engines', [L('Google', 'https://www.google.com/'), L('Bing', 'https://www.bing.com/'), L('DuckDuckGo', 'https://duckduckgo.com/')]),
+      C('Entertainment', [L('YouTube', 'https://www.youtube.com/')]),
+      C('LLM', [L('ChatGPT', 'https://chatgpt.com/'), L('Claude', 'https://claude.ai/'), L('Mistral', 'https://chat.mistral.ai/'), L('Gemini', 'https://gemini.google.com/'), L('Copilot', 'https://copilot.microsoft.com/')]),
+      C('Office', [
+        L('Word', 'https://www.office.com/launch/word'),
+        L('Excel', 'https://www.office.com/launch/excel'),
+        L('PowerPoint', 'https://www.office.com/launch/powerpoint'),
+        L('OneNote', 'https://www.office.com/launch/onenote'),
+        L('Outlook', 'https://outlook.office.com/'),
+        L('OneDrive', 'https://onedrive.live.com/'),
+        L('Teams', 'https://teams.microsoft.com/'),
+      ]),
+      C('Shopping', [L('Amazon', 'https://www.amazon.com/'), L('eBay', 'https://www.ebay.com/')]),
+      C('Dev', [L('GitHub', 'https://github.com/'), L('Stack Overflow', 'https://stackoverflow.com/')]),
+    ],
+    settings: { newTab: true, icons: true, iconSource: 'google', theme: null, engine: 'google', engines: DEFAULT_ENGINES(), shortcuts: DEFAULT_SHORTCUTS(), migrated: ['llm-gemini-copilot'] },
+  };
+}
+
+/* One-time upgrades for dashboards saved by an older version of this file. */
+function migrate(s) {
+  const done = s.settings.migrated;
+  if (!done.includes('llm-gemini-copilot')) {
+    let cat = s.categories.find((c) => c.name.toLowerCase() === 'llm');
+    if (!cat) { cat = { id: uid(), name: 'LLM', links: [] }; s.categories.push(cat); }
+    for (const [name, url] of [['Gemini', 'https://gemini.google.com/'], ['Copilot', 'https://copilot.microsoft.com/']]) {
+      if (!cat.links.some((l) => hostOf(l.url) === hostOf(url))) cat.links.push({ id: uid(), name, url });
+    }
+    done.push('llm-gemini-copilot');
+  }
+  return s;
+}
+
+function sanitize(s) {
+  const d = defaultState();
+  if (!s || !Array.isArray(s.categories)) throw new Error('This file is not a valid dashboard backup.');
+  const categories = s.categories.map((c) => ({
+    id: String((c && c.id) || uid()),
+    name: String((c && c.name) || 'Untitled').slice(0, 60),
+    links: (c && Array.isArray(c.links) ? c.links : []).map((l) => {
+      const url = normUrl(l && l.url);
+      return url ? { id: String(l.id || uid()), name: String(l.name || hostOf(url)).slice(0, 60), url } : null;
+    }).filter(Boolean),
+  }));
+  const st = Object.assign({}, d.settings, s.settings || {});
+  let engines = Array.isArray(st.engines) ? st.engines.filter((e) => e && e.name && typeof e.url === 'string' && /^https?:\/\/.+%s/i.test(e.url))
+    .map((e) => ({ id: String(e.id || uid()), name: String(e.name).slice(0, 40), url: e.url })) : [];
+  if (!engines.length) engines = DEFAULT_ENGINES();
+  st.engines = engines;
+  if (!engines.some((e) => e.id === st.engine)) st.engine = engines[0].id;
+  st.theme = st.theme === 'dark' || st.theme === 'light' ? st.theme : null;
+  st.newTab = !!st.newTab;
+  st.icons = !!st.icons;
+  st.iconSource = st.iconSource === 'ddg' ? 'ddg' : 'google';
+  const dsc = DEFAULT_SHORTCUTS(), sc = {};
+  for (const a in dsc) {
+    const b = st.shortcuts && st.shortcuts[a];
+    sc[a] = validShortcut(b)
+      ? Object.assign({ mods: MOD_ORDER.filter((m) => b.mods.includes(m)), key: String(b.key) }, b.code ? { code: String(b.code) } : {})
+      : dsc[a];
+  }
+  st.shortcuts = sc;
+  // Read from the saved settings only: the defaults already count as migrated, saved older data does not.
+  const savedMig = s.settings && s.settings.migrated;
+  st.migrated = Array.isArray(savedMig) ? savedMig.filter((x) => typeof x === 'string') : [];
+  return migrate({ categories, settings: st });
+}
+
+let storageOk = true;
+try { localStorage.setItem('dash.test', '1'); localStorage.removeItem('dash.test'); } catch (e) { storageOk = false; }
+
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) {}
+  if (raw) {
+    try { return sanitize(JSON.parse(raw)); }
+    catch (e) { try { localStorage.setItem(KEY + '.bak', raw); } catch (e2) {} }
+  }
+  return defaultState();
+}
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); storageOk = true; }
+  catch (e) { storageOk = false; }
+  $('#warn').hidden = storageOk;
+}
+
+let state = load();
+
+/* ---------- UI state ---------- */
+let editing = false;
+let mode = 'links';          // 'links' (filter local links) or 'web'
+let query = '';
+let sel = 0;
+let selReset = true;
+let matches = [];            // [{link, el}] currently visible while filtering
+let ddOpen = false, ddIdx = 0;
+
+const q = $('#q'), modeBtn = $('#modeBtn'), engineBtn = $('#engineBtn'), dd = $('#dd'), search = $('#search');
+
+const engines = () => state.settings.engines;
+const currentEngine = () => engines().find((e) => e.id === state.settings.engine) || engines()[0];
+
+/* ---------- opening ---------- */
+function openUrl(url, invert) {
+  const newTab = state.settings.newTab !== !!invert;
+  if (newTab) window.open(url, '_blank', 'noopener,noreferrer');
+  else window.location.href = url;
+}
+
+/* ---------- theme ---------- */
+const sysDark = window.matchMedia('(prefers-color-scheme: dark)');
+function applyTheme() {
+  const t = state.settings.theme || (sysDark.matches ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', t);
+  $('#themeBtn').textContent = t === 'dark' ? '\u2600' : '\u263E';
+}
+$('#themeBtn').addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  state.settings.theme = cur === 'dark' ? 'light' : 'dark';
+  save(); applyTheme();
+});
+sysDark.addEventListener('change', applyTheme);
+
+/* ---------- rendering ---------- */
+function iconEl(link) {
+  const letter = h('span', { class: 'letter', 'aria-hidden': 'true', text: (link.name.trim()[0] || '?').toUpperCase(), style: 'background:' + hue(link.name) });
+  if (!state.settings.icons) return letter;
+  const host = hostOf(link.url);
+  const src = state.settings.iconSource === 'ddg'
+    ? `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`
+    : `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+  const img = h('img', { class: 'icon', src, alt: '', width: 24, height: 24, loading: 'lazy', referrerpolicy: 'no-referrer' });
+  img.addEventListener('error', () => img.replaceWith(letter));
+  return img;
+}
+
+function tile(cat, link) {
+  const a = h('a', {
+    class: 'tile', href: link.url, title: link.url,
+    target: state.settings.newTab ? '_blank' : '_self', rel: 'noopener noreferrer',
+  }, iconEl(link), h('span', { class: 'name', text: link.name }));
+  a.addEventListener('click', (e) => { if (editing) { e.preventDefault(); openLinkDlg(link.id); } });
+  const wrap = h('div', { class: 'tile-wrap' }, a);
+  if (editing) wrap.append(h('button', { class: 'x', type: 'button', title: 'Remove', 'aria-label': 'Remove ' + link.name, text: '\u00d7', onclick: () => removeLink(cat.id, link.id) }));
+  return { wrap, a };
+}
+
+function render() {
+  const main = $('#main');
+  main.replaceChildren();
+  document.body.classList.toggle('editing', editing);
+  matches = [];
+  const terms = mode === 'links' ? query.trim().toLowerCase().split(/\s+/).filter(Boolean) : [];
+  const filtering = terms.length > 0;
+
+  for (const cat of state.categories) {
+    const links = filtering
+      ? cat.links.filter((l) => { const hay = (l.name + ' ' + hostOf(l.url) + ' ' + cat.name).toLowerCase(); return terms.every((t) => hay.includes(t)); })
+      : cat.links;
+    if (filtering && !links.length) continue;
+
+    const head = h('div', { class: 'cat-head' }, h('h2', { text: cat.name }));
+    if (editing) {
+      head.append(h('div', { class: 'cat-tools' },
+        h('button', { class: 'btn small', type: 'button', title: 'Move up', text: '\u2191', onclick: () => moveCat(cat.id, -1) }),
+        h('button', { class: 'btn small', type: 'button', title: 'Move down', text: '\u2193', onclick: () => moveCat(cat.id, 1) }),
+        h('button', { class: 'btn small', type: 'button', text: 'Rename', onclick: () => openCatDlg(cat.id) }),
+        h('button', { class: 'btn small danger', type: 'button', text: 'Delete', onclick: () => removeCat(cat.id) })));
+    }
+    const grid = h('div', { class: 'grid' });
+    for (const link of links) {
+      const t = tile(cat, link);
+      grid.append(t.wrap);
+      if (filtering) matches.push({ link, el: t.a });
+    }
+    if (editing && !filtering) grid.append(h('button', { class: 'add-tile', type: 'button', text: '+ Add link', onclick: () => openLinkDlg(null, cat.id) }));
+    if (!links.length && !editing) grid.append(h('div', { class: 'empty', text: 'No links yet. Use Edit to add some.' }));
+    main.append(h('section', { class: 'cat' }, head, grid));
+  }
+
+  if (!state.categories.length) {
+    main.append(h('div', { class: 'empty', text: 'No categories yet. Use "+ Link" to add your first link, or Edit to add a category.' }));
+  } else if (filtering && !matches.length) {
+    main.append(h('div', { class: 'empty', text: `No links match "${query.trim()}". Press ${fmtText(state.settings.shortcuts.mode)} to search the web instead.` }));
+  }
+  if (editing) main.append(h('div', { class: 'foot' }, h('button', { class: 'btn', type: 'button', text: '+ Add category', onclick: () => openCatDlg(null) })));
+
+  if (selReset) {
+    const t = terms.join(' ');
+    const i = matches.findIndex((m) => m.link.name.toLowerCase().startsWith(t));
+    sel = i < 0 ? 0 : i;
+    selReset = false;
+  }
+  if (sel >= matches.length) sel = 0;
+  paintSel();
+}
+
+function paintSel() {
+  matches.forEach((m, i) => m.el.classList.toggle('sel', i === sel));
+}
+function moveSel(d) {
+  if (!matches.length) return;
+  sel = (sel + d + matches.length) % matches.length;
+  paintSel();
+  matches[sel].el.scrollIntoView({ block: 'nearest' });
+}
+
+/* ---------- search bar ---------- */
+function updateSearchUI() {
+  const eng = currentEngine();
+  const sc = state.settings.shortcuts;
+  modeBtn.textContent = mode === 'links' ? 'Links' : 'Web';
+  modeBtn.title = `Switch between link filter and web search (${fmtText(sc.mode)})`;
+  engineBtn.textContent = (mode === 'links' ? 'Local links' : eng.name) + ' \u25BE';
+  engineBtn.title = `Choose search engine (${fmtText(sc.engines)})`;
+  q.placeholder = mode === 'links' ? `Filter your links\u2026   ( ${fmtText(sc.focus)} to focus )` : `Search the web with ${eng.name}\u2026`;
+  search.classList.toggle('web', mode === 'web');
+}
+
+function focusSearch() { q.focus(); q.select(); }
+
+function setMode(m) {
+  mode = m; selReset = true; updateSearchUI(); render();
+}
+function toggleMode() { setMode(mode === 'links' ? 'web' : 'links'); focusSearch(); }
+
+function submitSearch(invert) {
+  if (mode === 'links') {
+    if (query.trim() && matches[sel]) openUrl(matches[sel].link.url, invert);
+  } else if (query.trim()) {
+    const url = currentEngine().url.replace('%s', () => encodeURIComponent(query.trim()));
+    openUrl(url, invert);
+  }
+}
+
+q.addEventListener('input', () => { query = q.value; selReset = true; if (mode === 'links') render(); });
+q.addEventListener('keydown', (e) => {
+  if (e.isComposing) return;
+  if (e.key === 'Enter') { e.preventDefault(); submitSearch(e.shiftKey); }
+  else if (e.key === 'Escape') {
+    if (q.value) { q.value = ''; query = ''; selReset = true; render(); } else q.blur();
+  } else if (mode === 'links' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    e.preventDefault(); moveSel(e.key === 'ArrowDown' ? 1 : -1);
+  }
+});
+modeBtn.addEventListener('click', toggleMode);
+
+/* ---------- engine dropdown ---------- */
+// The list holds "Local links" first, then the search engines.
+const ddItems = () => [{ id: '__local', name: 'Local links' }, ...engines()];
+const activeId = () => (mode === 'links' ? '__local' : currentEngine().id);
+function renderDropdown() {
+  const cur = activeId();
+  dd.replaceChildren(...ddItems().map((e, i) => h('li', {
+    role: 'option', 'aria-selected': String(e.id === cur), class: (i === ddIdx ? 'hi ' : '') + (i === 0 ? 'sep' : ''),
+    onmouseenter: () => { ddIdx = i; paintDropdown(); },
+    onclick: () => chooseEngine(i),
+  }, h('span', { text: e.name }), h('span', { class: 'tick', text: e.id === cur ? '\u2713' : '' }))));
+}
+function paintDropdown() { [...dd.children].forEach((li, i) => li.classList.toggle('hi', i === ddIdx)); }
+function openDropdown() {
+  ddOpen = true;
+  ddIdx = Math.max(0, ddItems().findIndex((e) => e.id === activeId()));
+  renderDropdown(); dd.hidden = false; engineBtn.setAttribute('aria-expanded', 'true');
+}
+function closeDropdown() { ddOpen = false; dd.hidden = true; engineBtn.setAttribute('aria-expanded', 'false'); }
+function toggleDropdown() { ddOpen ? closeDropdown() : openDropdown(); }
+function chooseEngine(i) {
+  const item = ddItems()[i];
+  if (item.id === '__local') { closeDropdown(); setMode('links'); focusSearch(); return; }
+  state.settings.engine = item.id;
+  save(); closeDropdown(); setMode('web'); focusSearch();
+}
+engineBtn.addEventListener('click', () => { toggleDropdown(); });
+document.addEventListener('click', (e) => { if (ddOpen && !e.target.closest('.engine-wrap')) closeDropdown(); });
+
+/* ---------- global shortcuts ---------- */
+const isTyping = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+
+document.addEventListener('keydown', (e) => {
+  if (document.querySelector('dialog[open]')) return;
+  const sc = state.settings.shortcuts;
+
+  // Switch between link filter and web search (last used engine)
+  if (matchKey(e, sc.mode)) {
+    e.preventDefault(); e.stopPropagation();
+    closeDropdown(); toggleMode();
+    return;
+  }
+
+  // Open the search engine list
+  if (matchKey(e, sc.engines)) {
+    e.preventDefault(); e.stopPropagation();
+    focusSearch(); toggleDropdown();
+    return;
+  }
+
+  if (ddOpen) {
+    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Tab'].includes(e.key)) {
+      e.preventDefault(); e.stopPropagation();
+      const n = ddItems().length;
+      if (e.key === 'ArrowDown') { ddIdx = (ddIdx + 1) % n; paintDropdown(); }
+      else if (e.key === 'ArrowUp') { ddIdx = (ddIdx - 1 + n) % n; paintDropdown(); }
+      else if (e.key === 'Enter') chooseEngine(ddIdx);
+      else closeDropdown();
+    }
+    return;
+  }
+
+  // Focus the search bar (a plain-key shortcut is ignored while typing in a field)
+  if (matchKey(e, sc.focus) && (!isTyping(e.target) || sc.focus.mods.some((m) => m !== 'shift'))) {
+    e.preventDefault(); focusSearch();
+  }
+}, true);
+
+/* ---------- toast ---------- */
+let toastTimer;
+function hideToast() { clearTimeout(toastTimer); $('#toast').hidden = true; }
+function toast(msg, undo) {
+  const t = $('#toast');
+  t.replaceChildren(h('span', { text: msg }), undo && h('button', { type: 'button', text: 'Undo', onclick: () => { undo(); hideToast(); } }));
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 7000);
+}
+
+/* ---------- link / category actions ---------- */
+function removeLink(catId, linkId) {
+  const cat = state.categories.find((c) => c.id === catId);
+  const i = cat.links.findIndex((l) => l.id === linkId);
+  const [link] = cat.links.splice(i, 1);
+  save(); render();
+  toast(`Removed "${link.name}"`, () => { cat.links.splice(Math.min(i, cat.links.length), 0, link); save(); render(); });
+}
+function removeCat(catId) {
+  const i = state.categories.findIndex((c) => c.id === catId);
+  const [cat] = state.categories.splice(i, 1);
+  save(); render();
+  toast(`Deleted category "${cat.name}"`, () => { state.categories.splice(Math.min(i, state.categories.length), 0, cat); save(); render(); });
+}
+function moveCat(catId, d) {
+  const i = state.categories.findIndex((c) => c.id === catId), j = i + d;
+  if (j < 0 || j >= state.categories.length) return;
+  [state.categories[i], state.categories[j]] = [state.categories[j], state.categories[i]];
+  save(); render();
+}
+const findCatByName = (name) => state.categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+
+/* ---------- link dialog ---------- */
+const linkDlg = $('#linkDlg'), lName = $('#lName'), lUrl = $('#lUrl'), lCatSel = $('#lCatSel'), lNewCat = $('#lNewCat'), lNewWrap = $('#lNewWrap'), lErr = $('#lErr');
+let editId = null;
+
+function syncNewCat() {
+  const isNew = lCatSel.value === '__new';
+  lNewWrap.hidden = !isNew;
+  lNewCat.required = isNew;
+}
+lCatSel.addEventListener('change', () => { syncNewCat(); if (!lNewWrap.hidden) lNewCat.focus(); });
+
+function openLinkDlg(linkId, catId) {
+  editId = linkId || null;
+  let link = null, cat = null;
+  if (linkId) for (const c of state.categories) { const l = c.links.find((x) => x.id === linkId); if (l) { link = l; cat = c; } }
+  else if (catId) cat = state.categories.find((c) => c.id === catId);
+  $('#linkTitle').textContent = link ? 'Edit link' : 'Add link';
+  lName.value = link ? link.name : '';
+  lUrl.value = link ? link.url : '';
+  lCatSel.replaceChildren(...state.categories.map((c) => h('option', { value: c.id, text: c.name })), h('option', { value: '__new', text: '+ New category\u2026' }));
+  lCatSel.value = cat ? cat.id : (state.categories[0] ? state.categories[0].id : '__new');
+  lNewCat.value = '';
+  syncNewCat();
+  lErr.hidden = true;
+  linkDlg.showModal();
+  lUrl.focus();
+}
+$('#addBtn').addEventListener('click', () => openLinkDlg(null));
+
+$('#linkForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const fail = (m) => { lErr.textContent = m; lErr.hidden = false; };
+  const url = normUrl(lUrl.value);
+  if (!url) return fail('Enter a valid web address (http or https).');
+  let cat;
+  if (lCatSel.value === '__new') {
+    const nm = lNewCat.value.trim();
+    if (!nm) return fail('Enter a category name.');
+    cat = findCatByName(nm);
+    if (!cat) { cat = { id: uid(), name: nm, links: [] }; state.categories.push(cat); }
+  } else cat = state.categories.find((c) => c.id === lCatSel.value);
+  const name = lName.value.trim() || hostOf(url);
+
+  if (editId) {
+    let oldCat, link;
+    for (const c of state.categories) { const l = c.links.find((x) => x.id === editId); if (l) { oldCat = c; link = l; } }
+    link.name = name; link.url = url;
+    if (oldCat !== cat) { oldCat.links = oldCat.links.filter((x) => x !== link); cat.links.push(link); }
+  } else cat.links.push({ id: uid(), name, url });
+  save(); render(); linkDlg.close();
+});
+
+/* ---------- category dialog ---------- */
+const catDlg = $('#catDlg'), cName = $('#cName');
+let editCatId = null;
+function openCatDlg(catId) {
+  editCatId = catId;
+  const cat = catId && state.categories.find((c) => c.id === catId);
+  $('#catTitle').textContent = cat ? 'Rename category' : 'Add category';
+  cName.value = cat ? cat.name : '';
+  catDlg.showModal(); cName.focus(); cName.select();
+}
+$('#catForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const nm = cName.value.trim();
+  if (!nm) return;
+  if (editCatId) state.categories.find((c) => c.id === editCatId).name = nm;
+  else if (!findCatByName(nm)) state.categories.push({ id: uid(), name: nm, links: [] });
+  save(); render(); catDlg.close();
+});
+
+/* ---------- edit mode ---------- */
+$('#editBtn').addEventListener('click', () => {
+  editing = !editing;
+  $('#editBtn').textContent = editing ? 'Done' : 'Edit';
+  $('#editBtn').setAttribute('aria-pressed', String(editing));
+  render();
+});
+
+/* ---------- settings ---------- */
+const setDlg = $('#setDlg');
+function syncSettingsUI() {
+  $('#sNewTab').value = state.settings.newTab ? '1' : '0';
+  $('#sIcons').checked = state.settings.icons;
+  $('#sIconSrc').value = state.settings.iconSource;
+  $('#sIconSrc').disabled = !state.settings.icons;
+  renderEngList();
+  renderShortcuts();
+}
+function renderEngList() {
+  const list = $('#engList');
+  list.replaceChildren(...engines().map((e) => h('li', {},
+    h('span', {}, h('strong', { text: e.name }), h('div', { class: 'u', text: e.url })),
+    h('button', { class: 'btn small danger', type: 'button', text: 'Remove', disabled: engines().length <= 1 ? true : null, onclick: () => {
+      state.settings.engines = engines().filter((x) => x.id !== e.id);
+      if (state.settings.engine === e.id) state.settings.engine = state.settings.engines[0].id;
+      save(); renderEngList(); updateSearchUI();
+    } }))));
+}
+/* ---------- editable shortcuts ---------- */
+let listening = null;
+const scErr = $('#scErr');
+const showScErr = (m) => { scErr.textContent = m; scErr.hidden = !m; };
+const sameCombo = (a, b) => a.key === b.key && a.mods.join() === b.mods.join();
+
+function validateShortcut(action, b) {
+  if (b.mods.length + 1 > 3) return 'Use at most 3 keys (modifier keys count).';
+  if (!b.mods.some((m) => m !== 'shift')) {
+    if (action !== 'focus') return 'This shortcut also works while you type, so it needs Ctrl, Alt or Meta.';
+    if (['Enter', 'Tab', 'Escape', ' ', 'Backspace', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(b.key)) {
+      return 'That key is needed for normal navigation. Pick another one.';
+    }
+  }
+  for (const a of SC_ACTIONS) {
+    if (a.id !== action && sameCombo(state.settings.shortcuts[a.id], b)) return `Already used for "${a.label}".`;
+  }
+  return '';
+}
+
+function renderShortcuts() {
+  $('#scTable').replaceChildren(...SC_ACTIONS.map((a) => {
+    const on = listening === a.id;
+    const keys = on
+      ? h('em', { text: 'Press the new keys… (Esc cancels)' })
+      : h('span', {}, comboParts(state.settings.shortcuts[a.id]).flatMap((p, i) => [i ? ' + ' : '', h('kbd', { text: p })]));
+    return h('tr', {},
+      h('td', { text: a.label }),
+      h('td', {}, keys),
+      h('td', {}, h('button', { class: 'btn small', type: 'button', text: on ? 'Cancel' : 'Change',
+        onclick: () => { listening = on ? null : a.id; showScErr(''); renderShortcuts(); } })));
+  }));
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!listening) return;
+  e.preventDefault(); e.stopPropagation();
+  if (['Control', 'Shift', 'Alt', 'Meta', 'AltGraph', 'OS'].includes(e.key)) return;
+  const mods = MOD_ORDER.filter((m) => e[m + 'Key']);
+  if (e.key === 'Escape' && !mods.length) { listening = null; showScErr(''); renderShortcuts(); return; }
+  const b = { mods, key: e.key.length === 1 ? e.key.toLowerCase() : e.key };
+  if (/^(Key|Digit)/.test(e.code)) b.code = e.code;
+  const err = validateShortcut(listening, b);
+  if (err) { showScErr(err); return; }
+  state.settings.shortcuts[listening] = b;
+  listening = null; showScErr('');
+  save(); renderShortcuts(); updateSearchUI(); render();
+}, true);
+
+setDlg.addEventListener('cancel', (e) => { if (listening) e.preventDefault(); });
+setDlg.addEventListener('close', () => { listening = null; showScErr(''); });
+$('#resetScBtn').addEventListener('click', () => {
+  state.settings.shortcuts = DEFAULT_SHORTCUTS();
+  listening = null; showScErr('');
+  save(); renderShortcuts(); updateSearchUI(); render();
+});
+
+$('#setBtn').addEventListener('click', () => { syncSettingsUI(); setDlg.showModal(); });
+$('#sNewTab').addEventListener('change', (e) => { state.settings.newTab = e.target.value === '1'; save(); render(); });
+$('#sIcons').addEventListener('change', (e) => { state.settings.icons = e.target.checked; $('#sIconSrc').disabled = !e.target.checked; save(); render(); });
+$('#sIconSrc').addEventListener('change', (e) => { state.settings.iconSource = e.target.value; save(); render(); });
+
+$('#engForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('#eName').value.trim(), url = $('#eUrl').value.trim(), err = $('#eErr');
+  if (!/^https?:\/\/.+/i.test(url) || !url.includes('%s')) { err.textContent = 'The URL must start with http(s):// and contain %s where the search text goes.'; err.hidden = false; return; }
+  err.hidden = true;
+  state.settings.engines.push({ id: uid(), name, url });
+  save(); e.target.reset(); renderEngList(); updateSearchUI();
+});
+
+$('#exportBtn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = h('a', { href: URL.createObjectURL(blob), download: `dashboard-backup-${new Date().toISOString().slice(0, 10)}.json` });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('#importBtn').addEventListener('click', () => $('#importFile').click());
+$('#importFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try {
+    const next = sanitize(JSON.parse(await f.text()));
+    if (!confirm('Replace your current dashboard with the contents of this file?')) return;
+    state = next; save(); refreshAll(); syncSettingsUI();
+  } catch (err) { alert('Import failed: ' + err.message); }
+});
+$('#resetBtn').addEventListener('click', () => {
+  if (!confirm('Reset everything to the default links and settings? This cannot be undone.')) return;
+  state = defaultState(); save(); refreshAll(); syncSettingsUI();
+});
+
+/* ---------- dialogs: generic close buttons ---------- */
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-close]');
+  if (b) b.closest('dialog').close();
+});
+
+/* ---------- init ---------- */
+function refreshAll() { applyTheme(); updateSearchUI(); selReset = true; render(); }
+window.addEventListener('storage', (e) => { if (e.key === KEY) { state = load(); refreshAll(); } });
+
+save();
+refreshAll();
+})();
+</script>
+</body>
+</html>

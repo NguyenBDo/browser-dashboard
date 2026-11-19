@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launchpad</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg:#f4f6f9; --surface:#fff; --surface-2:#eef1f5; --text:#182230;
+  --muted:#687586; --line:#dfe5ec; --accent:#356ee6; --accent-soft:#e8efff;
+  --danger:#c0392b; --shadow:0 8px 28px rgba(25,39,58,.08);
+}
+:root[data-theme="dark"] {
+  color-scheme:dark;
+  --bg:#11151b; --surface:#1a2029; --surface-2:#252d38; --text:#edf2f8;
+  --muted:#a2adbb; --line:#303a48; --accent:#82aaff; --accent-soft:#263754;
+  --danger:#ff8177; --shadow:0 8px 28px rgba(0,0,0,.22);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px clamp(18px,4vw,54px);border-bottom:1px solid var(--line);background:var(--surface)}
+.brand{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:700;letter-spacing:-.4px}
+.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--accent);color:white;font-size:18px}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--text);padding:8px 12px;border-radius:9px}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:white}
+.btn.icon{width:38px;height:38px;padding:0;font-size:17px}
+main{width:min(1100px,calc(100% - 36px));margin:38px auto 70px}
+.hero{margin:0 auto 30px;max-width:760px;text-align:center}
+h1{font-size:clamp(27px,4vw,38px);letter-spacing:-1.1px;margin:0 0 7px}
+.subtitle{color:var(--muted);margin:0 0 23px}
+.search-wrap{position:relative;max-width:720px;margin:auto}
+.searchbox{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:6px 8px 6px 15px;box-shadow:var(--shadow)}
+.search-symbol{color:var(--muted);font-size:19px}
+#searchInput{min-width:0;flex:1;border:0;outline:0;background:transparent;color:var(--text);padding:9px 0;font-size:16px}
+#searchInput::placeholder{color:var(--muted)}
+.mode-pill{border:0;border-radius:8px;background:var(--surface-2);color:var(--muted);padding:7px 10px;white-space:nowrap}
+.mode-pill:hover{color:var(--text)}
+.hint{font-size:12px;color:var(--muted);margin-top:9px}
+.engine-menu{position:absolute;z-index:5;top:calc(100% + 8px);right:0;width:230px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);text-align:left}
+.engine-menu[hidden]{display:none}
+.engine-option{display:flex;justify-content:space-between;width:100%;padding:9px 10px;border:0;border-radius:7px;background:transparent;color:var(--text);text-align:left}
+.engine-option.active,.engine-option:hover{background:var(--accent-soft)}
+.engine-option small{color:var(--muted)}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:34px 0 18px}
+.toolbar h2{font-size:18px;margin:0}
+.toolbar-note{font-size:13px;color:var(--muted)}
+#categories{display:grid;gap:27px}
+.category-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.category-head h3{font-size:15px;margin:0;font-weight:700}
+.category-count{font-size:12px;color:var(--muted)}
+.link-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:11px}
+.site-card{position:relative;display:flex;align-items:center;gap:12px;min-height:68px;padding:12px 42px 12px 13px;background:var(--surface);border:1px solid var(--line);border-radius:11px;text-decoration:none;color:var(--text);transition:border-color .12s}
+.site-card:hover{border-color:var(--accent)}
+.site-icon{width:34px;height:34px;flex:0 0 34px;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;overflow:hidden;font-size:16px;font-weight:650;color:var(--muted)}
+.site-icon img{width:22px;height:22px;object-fit:contain}
+.site-info{min-width:0}
+.site-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.site-url{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-tools{position:absolute;right:7px;top:50%;transform:translateY(-50%);display:flex;gap:2px;opacity:0;transition:opacity .12s}
+.site-card:hover .card-tools,.site-card:focus-within .card-tools{opacity:1}
+.mini-btn{border:0;background:var(--surface-2);color:var(--muted);width:27px;height:27px;border-radius:7px}
+.mini-btn:hover{color:var(--text)}
+.empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
+footer{margin-top:35px;text-align:center;color:var(--muted);font-size:12px}
+kbd{font:inherit;font-size:11px;padding:2px 5px;border:1px solid var(--line);border-radius:5px;background:var(--surface-2)}
+dialog{width:min(460px,calc(100% - 28px));border:1px solid var(--line);border-radius:15px;padding:0;background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(8,13,20,.48)}
+.dialog-head{padding:19px 21px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.dialog-head h2{font-size:18px;margin:0}
+.dialog-body{padding:20px 21px}
+.field{display:grid;gap:6px;margin-bottom:14px}
+.field label{font-size:13px;font-weight:600}
+.field input,.field select{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);outline-color:var(--accent)}
+.checkline{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px;margin:5px 0 16px}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.settings-row{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:13px 0;border-bottom:1px solid var(--line)}
+.settings-row:last-child{border-bottom:0}
+.settings-row strong{display:block;font-size:14px}
+.settings-row span{display:block;color:var(--muted);font-size:12px}
+.settings-row select{padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+@media(max-width:600px){.topbar{padding:14px 17px}.brand{font-size:17px}.actions .btn:not(.icon){padding:7px 9px;font-size:13px}main{margin-top:27px}.toolbar{align-items:flex-start}.link-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr))}.site-card{min-height:62px}.card-tools{opacity:1}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">↗</span> Launchpad</div>
+  <div class="actions">
+    <button class="btn" id="addBtn">＋ Add website</button>
+    <button class="btn" id="settingsBtn">Settings</button>
+    <button class="btn icon" id="themeBtn" title="Toggle light/dark theme" aria-label="Toggle theme">☾</button>
+  </div>
+</header>
+<main>
+  <section class="hero">
+    <h1>Your web, one click away.</h1>
+    <p class="subtitle">A simple home for the sites you use most.</p>
+    <div class="search-wrap">
+      <div class="searchbox">
+        <span class="search-symbol">⌕</span>
+        <input id="searchInput" type="search" autocomplete="off" placeholder="Search your links…" aria-label="Search links or the web">
+        <button class="mode-pill" id="modeButton" title="Switch between link search and web search">Links</button>
+      </div>
+      <div class="engine-menu" id="engineMenu" hidden></div>
+      <div class="hint">Keyboard shortcuts are customizable in Settings.</div>
+    </div>
+  </section>
+  <div class="toolbar">
+    <h2 id="sectionTitle">Your websites</h2>
+    <span class="toolbar-note" id="resultCount"></span>
+  </div>
+  <div id="categories"></div>
+  <footer>Saved in this browser on this device. Use Export in Settings to keep a backup.</footer>
+</main>
+
+<dialog id="siteDialog">
+  <form id="siteForm">
+    <div class="dialog-head"><h2 id="siteDialogTitle">Add website</h2><button type="button" class="btn icon" data-close="siteDialog" aria-label="Close">×</button></div>
+    <div class="dialog-body">
+      <input type="hidden" id="siteId">
+      <div class="field"><label for="siteName">Name</label><input id="siteName" required maxlength="60" placeholder="e.g. Wikipedia"></div>
+      <div class="field"><label for="siteUrl">Website URL</label><input id="siteUrl" required type="text" placeholder="https://example.com"></div>
+      <div class="field"><label for="siteCategory">Category</label><input id="siteCategory" list="categoryOptions" required maxlength="40" placeholder="e.g. Research"><datalist id="categoryOptions"></datalist></div>
+      <label class="checkline"><input type="checkbox" id="siteIconEnabled" checked> Fetch website icon (favicon)</label>
+      <div class="dialog-actions"><button type="button" class="btn" data-close="siteDialog">Cancel</button><button class="btn primary" type="submit">Save website</button></div>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settingsDialog">
+  <div class="dialog-head"><h2>Settings</h2><button class="btn icon" data-close="settingsDialog" aria-label="Close">×</button></div>
+  <div class="dialog-body">
+    <div class="settings-row"><div><strong>Open websites in</strong><span>Choose where dashboard links open</span></div><select id="openMode"><option value="new">New tab</option><option value="same">Current tab</option></select></div>
+    <div class="settings-row"><div><strong>Website icons</strong><span>Fetch favicons for your links by default</span></div><select id="defaultIcons"><option value="yes">Enabled</option><option value="no">Disabled</option></select></div>
+    <div class="settings-row"><div><strong>Appearance</strong><span>Light or dark interface</span></div><select id="themeSelect"><option value="light">Light</option><option value="dark">Dark</option></select></div>
+    <div style="padding:14px 0;border-bottom:1px solid var(--line)">
+      <strong style="font-size:14px">Keyboard shortcuts</strong>
+      <span style="display:block;color:var(--muted);font-size:12px;margin:3px 0 10px">Click a shortcut, then press up to 3 keys together. Defaults are preserved until changed.</span>
+      <div class="settings-row"><div><strong>Focus search</strong><span>Jump to the search field</span></div><button class="btn shortcut-btn" type="button" data-shortcut="focus"></button></div>
+      <div class="settings-row"><div><strong>Choose search engine</strong><span>Open the engine selector</span></div><button class="btn shortcut-btn" type="button" data-shortcut="engine"></button></div>
+      <div class="settings-row"><div><strong>Switch search mode</strong><span>Toggle local links and web search</span></div><button class="btn shortcut-btn" type="button" data-shortcut="toggle"></button></div>
+      <button class="btn" id="resetShortcuts" type="button" style="margin-top:10px">Reset shortcuts to defaults</button>
+    </div>
+    <div class="settings-row"><div><strong>Backup your dashboard</strong><span>Export or restore links and preferences</span></div><div style="display:flex;gap:6px"><button class="btn" id="exportBtn" type="button">Export</button><button class="btn" id="importBtn" type="button">Import</button><input id="importFile" type="file" accept="application/json,.json" hidden></div></div>
+    <p style="font-size:12px;color:var(--muted);margin:16px 0 0">Your data stays in this browser's local storage. It is not synced to other browsers or devices.</p>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'launchpad.dashboard.v1';
+  const defaults = [
+    ['Google','https://www.google.com/','Search engines'],
+    ['Bing','https://www.bing.com/','Search engines'],
+    ['DuckDuckGo','https://duckduckgo.com/','Search engines'],
+    ['YouTube','https://www.youtube.com/','Entertainment'],
+    ['ChatGPT','https://chatgpt.com/','LLM'],
+    ['Claude','https://claude.ai/','LLM'],
+    ['Mistral','https://chat.mistral.ai/','LLM'],
+    ['Word','https://www.microsoft365.com/launch/word','Office'],
+    ['Excel','https://www.microsoft365.com/launch/excel','Office'],
+    ['PowerPoint','https://www.microsoft365.com/launch/powerpoint','Office'],
+    ['Outlook','https://outlook.office.com/','Office'],
+    ['OneNote','https://www.microsoft365.com/launch/onenote','Office'],
+    ['OneDrive','https://onedrive.live.com/','Office'],
+    ['Teams','https://teams.microsoft.com/','Office'],
+    ['Amazon','https://www.amazon.com/','Shopping'],
+    ['eBay','https://www.ebay.com/','Shopping'],
+    ['GitHub','https://github.com/','Development'],
+    ['Stack Overflow','https://stackoverflow.com/','Development']
+  ].map((x,i)=>({id:'default-'+i,name:x[0],url:x[1],category:x[2],icon:true}));
+  const engines = [
+    {name:'Google',url:'https://www.google.com/search?q='},
+    {name:'Bing',url:'https://www.bing.com/search?q='},
+    {name:'DuckDuckGo',url:'https://duckduckgo.com/?q='}
+  ];
+  function defaultShortcuts(){return {focus:['/'],engine:['Control','/'],toggle:['Control','Space']};}
+  function normalizeShortcuts(value){
+    const defaults=defaultShortcuts(), result={};
+    for(const action of Object.keys(defaults)){
+      const candidate=value&&Array.isArray(value[action])?value[action]:defaults[action];
+      result[action]=candidate.length>0&&candidate.length<=3?candidate.map(String):defaults[action].slice();
+    }
+    return result;
+  }
+  function keyLabel(key){
+    return ({' ':'Space','Control':'Ctrl','Meta':'Meta','ArrowUp':'↑','ArrowDown':'↓','Escape':'Esc'}[key]||key);
+  }
+  function shortcutLabel(keys){return keys.map(keyLabel).join(' + ');}
+  function eventKeys(e){
+    const keys=[];
+    if(e.ctrlKey)keys.push('Control');
+    if(e.altKey)keys.push('Alt');
+    if(e.shiftKey)keys.push('Shift');
+    if(e.metaKey)keys.push('Meta');
+    if(!['Control','Alt','Shift','Meta'].includes(e.key)){
+      keys.push(e.key===' '?'Space':e.key);
+    }
+    return keys;
+  }
+  function matchesShortcut(e,keys){
+    const pressed=eventKeys(e);
+    return pressed.length===keys.length&&keys.every(k=>pressed.includes(k));
+  }
+  function refreshShortcutButtons(){
+    document.querySelectorAll('.shortcut-btn').forEach(b=>{
+      b.textContent=shortcutLabel(state.shortcuts[b.dataset.shortcut]);
+      b.dataset.waiting='false';
+    });
+  }
+  let capturingShortcut=null;
+  let state = loadState();
+  let searchMode = 'links';
+  let engineIndex = Math.max(0,engines.findIndex(e=>e.name===state.lastEngine));
+  let menuIndex = engineIndex;
+  const $ = id => document.getElementById(id);
+  const categoriesEl = $('categories');
+  const searchInput = $('searchInput');
+
+  function loadState(){
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if(saved && Array.isArray(saved.sites)) return {
+        sites:saved.sites, theme:saved.theme==='dark'?'dark':'light',
+        openMode:saved.openMode==='same'?'same':'new',
+        defaultIcons:saved.defaultIcons==='no'?'no':'yes',
+        lastEngine:saved.lastEngine||'Google',
+        shortcuts: normalizeShortcuts(saved.shortcuts)
+      };
+    } catch(e) {}
+    return {sites:defaults.map(x=>({...x})),theme:'light',openMode:'new',defaultIcons:'yes',lastEngine:'Google',shortcuts:defaultShortcuts()};
+  }
+  function save(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+  function applyTheme(){
+    document.documentElement.dataset.theme=state.theme;
+    $('themeBtn').textContent=state.theme==='dark'?'☀':'☾';
+    $('themeSelect').value=state.theme;
+  }
+  function safeUrl(raw){
+    let value=raw.trim();
+    if(!/^https?:\/\//i.test(value)) value='https://'+value;
+    const parsed=new URL(value);
+    if(!['http:','https:'].includes(parsed.protocol)) throw new Error('Only http and https websites are supported.');
+    return parsed.href;
+  }
+  function faviconUrl(url){
+    return 'https://www.google.com/s2/favicons?domain_url='+encodeURIComponent(url)+'&sz=64';
+  }
+  function makeCard(site){
+    const a=document.createElement('a');
+    a.className='site-card'; a.href=site.url;
+    a.target=state.openMode==='new'?'_blank':'_self';
+    if(state.openMode==='new') a.rel='noopener noreferrer';
+    const icon=document.createElement('span'); icon.className='site-icon';
+    if(site.icon!==false){
+      const img=document.createElement('img'); img.src=faviconUrl(site.url); img.alt='';
+      img.onerror=()=>{icon.textContent=(site.name||'?').slice(0,1).toUpperCase();};
+      icon.append(img);
+    } else icon.textContent=(site.name||'?').slice(0,1).toUpperCase();
+    const info=document.createElement('span'); info.className='site-info';
+    const name=document.createElement('span'); name.className='site-name'; name.textContent=site.name;
+    const url=document.createElement('span'); url.className='site-url'; url.textContent=new URL(site.url).hostname;
+    info.append(name,url); a.append(icon,info);
+    const tools=document.createElement('span'); tools.className='card-tools';
+    const edit=document.createElement('button'); edit.type='button'; edit.className='mini-btn'; edit.title='Edit website'; edit.textContent='✎';
+    edit.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openSiteDialog(site);});
+    const remove=document.createElement('button'); remove.type='button'; remove.className='mini-btn'; remove.title='Remove website'; remove.textContent='×';
+    remove.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(confirm('Remove '+site.name+' from your dashboard?')){state.sites=state.sites.filter(s=>s.id!==site.id);save();render();}});
+    tools.append(edit,remove); a.append(tools);
+    return a;
+  }
+  function render(){
+    const query=searchInput.value.trim().toLowerCase();
+    const filtered=state.sites.filter(s=>(s.name+' '+s.url+' '+s.category).toLowerCase().includes(query));
+    categoriesEl.replaceChildren();
+    const groups=new Map();
+    filtered.forEach(site=>{const cat=site.category||'Other';if(!groups.has(cat))groups.set(cat,[]);groups.get(cat).push(site);});
+    [...groups.keys()].sort((a,b)=>a.localeCompare(b)).forEach(cat=>{
+      const section=document.createElement('section');
+      const head=document.createElement('div');head.className='category-head';
+      const title=document.createElement('h3');title.textContent=cat;
+      const count=document.createElement('span');count.className='category-count';count.textContent=groups.get(cat).length+(groups.get(cat).length===1?' website':' websites');
+      head.append(title,count);
+      const grid=document.createElement('div');grid.className='link-grid';
+      groups.get(cat).sort((a,b)=>a.name.localeCompare(b.name)).forEach(site=>grid.append(makeCard(site)));
+      section.append(head,grid);categoriesEl.append(section);
+    });
+    if(!filtered.length){const empty=document.createElement('div');empty.className='empty';empty.textContent=query?'No matching websites. Try another search or add a link.':'Your dashboard is empty. Add a website to get started.';categoriesEl.append(empty);}
+    $('resultCount').textContent=filtered.length+' of '+state.sites.length+' websites';
+    $('sectionTitle').textContent=query?'Search results':'Your websites';
+    $('categoryOptions').replaceChildren(...[...new Set(state.sites.map(s=>s.category))].sort().map(c=>{const o=document.createElement('option');o.value=c;return o;}));
+  }
+  function setMode(mode){
+    searchMode=mode;
+    $('modeButton').textContent=mode==='links'?'Links · local':'Web · '+engines[engineIndex].name;
+    searchInput.placeholder=mode==='links'?'Search your links…':'Search the web with '+engines[engineIndex].name+'…';
+    $('sectionTitle').textContent=mode==='links'?'Your websites':'Your websites';
+    if(mode==='links') render();
+  }
+  function toggleMode(){setMode(searchMode==='links'?'web':'links');searchInput.focus();}
+  function openEngineMenu(){
+    const menu=$('engineMenu');menu.replaceChildren();
+    engines.forEach((engine,i)=>{
+      const b=document.createElement('button');b.type='button';b.className='engine-option'+(i===menuIndex?' active':'');
+      b.innerHTML='<span></span><small></small>';b.children[0].textContent=engine.name;b.children[1].textContent=i===engineIndex?'Selected':'';
+      b.addEventListener('click',()=>chooseEngine(i));menu.append(b);
+    });
+    menu.hidden=false;
+  }
+  function closeEngineMenu(){ $('engineMenu').hidden=true; }
+  function chooseEngine(i){engineIndex=(i+engines.length)%engines.length;state.lastEngine=engines[engineIndex].name;save();closeEngineMenu();setMode('web');searchInput.focus();}
+  function runSearch(){
+    const q=searchInput.value.trim();if(!q)return;
+    if(searchMode==='links'){setMode('web');}
+    const url=engines[engineIndex].url+encodeURIComponent(q);
+    if(state.openMode==='same') location.href=url; else window.open(url,'_blank','noopener');
+  }
+  function openSiteDialog(site){
+    $('siteForm').reset();$('siteId').value=site?.id||'';
+    $('siteDialogTitle').textContent=site?'Edit website':'Add website';
+    $('siteName').value=site?.name||'';
+    $('siteUrl').value=site?.url||'';
+    $('siteCategory').value=site?.category||'';
+    $('siteIconEnabled').checked=site?site.icon!==false:state.defaultIcons==='yes';
+    $('siteDialog').showModal();$('siteName').focus();
+  }
+
+  $('addBtn').addEventListener('click',()=>openSiteDialog());
+  $('settingsBtn').addEventListener('click',()=>{$('openMode').value=state.openMode;$('defaultIcons').value=state.defaultIcons;refreshShortcutButtons();$('settingsDialog').showModal();});
+  $('themeBtn').addEventListener('click',()=>{state.theme=state.theme==='dark'?'light':'dark';save();applyTheme();});
+  $('themeSelect').addEventListener('change',e=>{state.theme=e.target.value;save();applyTheme();});
+  $('openMode').addEventListener('change',e=>{state.openMode=e.target.value;save();render();});
+  $('defaultIcons').addEventListener('change',e=>{state.defaultIcons=e.target.value;save();});
+  document.querySelectorAll('.shortcut-btn').forEach(button=>button.addEventListener('click',()=>{
+    capturingShortcut=button.dataset.shortcut;
+    button.textContent='Press keys… (Esc cancels)';
+    button.dataset.waiting='true';
+  }));
+  $('resetShortcuts').addEventListener('click',()=>{
+    state.shortcuts=defaultShortcuts();capturingShortcut=null;save();refreshShortcutButtons();
+  });
+  $('modeButton').addEventListener('click',()=>searchMode==='links'?openEngineMenu():toggleMode());
+  searchInput.addEventListener('input',()=>{if(searchMode==='links')render();});
+  searchInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runSearch();}if(e.key==='Escape')closeEngineMenu();});
+  document.addEventListener('keydown',e=>{
+    if(capturingShortcut){
+      e.preventDefault();e.stopPropagation();
+      if(e.key==='Escape'){capturingShortcut=null;refreshShortcutButtons();return;}
+      if(['Control','Alt','Shift','Meta'].includes(e.key))return;
+      const keys=eventKeys(e);
+      if(keys.length>3){alert('A shortcut can contain up to 3 keys.');capturingShortcut=null;refreshShortcutButtons();return;}
+      const action=capturingShortcut;
+      const duplicate=Object.entries(state.shortcuts).some(([name,combo])=>name!==action&&combo.length===keys.length&&combo.every(k=>keys.includes(k)));
+      if(duplicate){alert('That shortcut is already assigned to another action.');capturingShortcut=null;refreshShortcutButtons();return;}
+      state.shortcuts[action]=keys;capturingShortcut=null;save();refreshShortcutButtons();return;
+    }
+    if(matchesShortcut(e,state.shortcuts.engine)){e.preventDefault();menuIndex=engineIndex;openEngineMenu();return;}
+    if(matchesShortcut(e,state.shortcuts.toggle)){e.preventDefault();toggleMode();return;}
+    if(matchesShortcut(e,state.shortcuts.focus)){
+      if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName))return;
+      e.preventDefault();searchInput.focus();return;
+    }
+    if(!$('engineMenu').hidden){
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();menuIndex=(menuIndex+(e.key==='ArrowDown'?1:-1)+engines.length)%engines.length;openEngineMenu();}
+      if(e.key==='Enter'){e.preventDefault();chooseEngine(menuIndex);}
+      if(e.key==='Escape')closeEngineMenu();
+    }
+  },true);
+  document.addEventListener('click',e=>{if(!e.target.closest('#engineMenu')&&!e.target.closest('#modeButton'))closeEngineMenu();});
+  $('siteForm').addEventListener('submit',e=>{
+    e.preventDefault();
+    try{
+      const id=$('siteId').value||('site-'+Date.now()+'-'+Math.random().toString(36).slice(2,7));
+      const site={id,name:$('siteName').value.trim(),url:safeUrl($('siteUrl').value),category:$('siteCategory').value.trim()||'Other',icon:$('siteIconEnabled').checked};
+      const index=state.sites.findIndex(s=>s.id===id);
+      if(index>=0)state.sites[index]=site;else state.sites.push(site);
+      save();$('siteDialog').close();render();
+    }catch(err){alert('Please enter a valid website URL. '+err.message);}
+  });
+  document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
+  $('exportBtn').addEventListener('click',()=>{
+    const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='launchpad-backup.json';a.click();URL.revokeObjectURL(a.href);
+  });
+  $('importBtn').addEventListener('click',()=>$('importFile').click());
+  $('importFile').addEventListener('change',async e=>{
+    const file=e.target.files[0];if(!file)return;
+    try{
+      const data=JSON.parse(await file.text());
+      if(!Array.isArray(data.sites))throw new Error('This file does not contain a Launchpad site list.');
+      const sites=data.sites.map(s=>({id:String(s.id||('site-'+Math.random())),name:String(s.name||'Website'),url:safeUrl(String(s.url||'')),category:String(s.category||'Other'),icon:s.icon!==false}));
+      state={sites,theme:data.theme==='dark'?'dark':'light',openMode:data.openMode==='same'?'same':'new',defaultIcons:data.defaultIcons==='no'?'no':'yes',lastEngine:data.lastEngine||'Google',shortcuts:normalizeShortcuts(data.shortcuts)};
+      engineIndex=Math.max(0,engines.findIndex(x=>x.name===state.lastEngine));save();applyTheme();render();$('openMode').value=state.openMode;$('defaultIcons').value=state.defaultIcons;alert('Dashboard backup imported.');
+    }catch(err){alert('Could not import backup: '+err.message);}
+    e.target.value='';
+  });
+  applyTheme();setMode('links');render();
+})();
+</script>
+</body>
+</html>
