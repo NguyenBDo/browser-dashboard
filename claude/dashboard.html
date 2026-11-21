@@ -49,11 +49,18 @@ button { cursor: pointer; }
 #modeBtn { border-right: 1px solid var(--border); border-radius: 10px 0 0 10px; min-width: 70px; }
 .search.web #modeBtn { color: var(--accent); font-weight: 600; }
 .engine-wrap { position: relative; }
+.go { margin: 4px; padding: 6px 14px; border: 0; border-radius: 7px; background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.go:hover:not(:disabled) { filter: brightness(1.08); }
+.go:disabled { background: var(--accent-soft); color: var(--muted); cursor: default; }
 .dd { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; min-width: 200px; margin: 0; padding: 4px;
   list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0,0,0,.18); }
 .dd li { padding: 8px 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 16px; }
 .dd li.hi { background: var(--accent-soft); }
+.dd-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.dd .icon, .dd .letter { width: 20px; height: 20px; font-size: 12px; }
+.chip .icon, .chip .letter { width: 18px; height: 18px; font-size: 11px; }
+.letter.local { background: var(--accent); color: var(--on-accent); }
 .dd li.sep { margin-bottom: 4px; border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; }
 .dd li .tick { color: var(--accent); }
 
@@ -71,6 +78,12 @@ main { max-width: 1200px; margin: 0 auto; padding: 4px 24px 72px; }
 .cat-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
 .cat-head h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .cat-tools { display: flex; gap: 6px; }
+.cat-toggle { display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 2px 0; margin: 0;
+  font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; border-radius: 4px; }
+.cat-toggle:hover:not(:disabled) { color: var(--text); }
+.cat-toggle:disabled { cursor: default; }
+.cat-toggle .chev { font-size: 9px; width: 10px; }
+.cat-toggle .count { font-weight: 400; letter-spacing: 0; text-transform: none; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
 .tile-wrap { position: relative; min-width: 0; }
 .tile { display: flex; align-items: center; gap: 10px; padding: 10px 12px; min-width: 0;
@@ -79,7 +92,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 4px 24px 72px; }
 .tile:hover { border-color: var(--accent); }
 .tile.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .tile .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.editing .tile { border-style: dashed; cursor: pointer; }
+.editing .tile { border-style: dashed; cursor: grab; }
+.tile-wrap.dragging { opacity: .4; }
+.tile-wrap.before .tile { box-shadow: -5px 0 0 var(--accent); }
+.cat.drop { outline: 2px dashed var(--accent); outline-offset: 8px; border-radius: 10px; }
 .icon, .letter { width: 24px; height: 24px; flex: none; border-radius: 6px; }
 .letter { display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 600; }
 .x { position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; padding: 0; line-height: 1;
@@ -95,6 +111,7 @@ dialog { border: 1px solid var(--border); border-radius: 12px; background: var(-
 dialog.wide { width: min(600px, 94vw); max-height: 90vh; overflow: auto; }
 dialog::backdrop { background: rgba(0,0,0,.45); }
 dialog h3 { margin: 0 0 14px; font-size: 17px; }
+#askMsg { margin: 0 0 14px; }
 dialog h4 { margin: 20px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 label { display: block; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
 label input:not([type=checkbox]), label select { display: block; width: 100%; margin-top: 4px; padding: 9px 10px;
@@ -138,6 +155,7 @@ table.keys.sc td:last-child { text-align: right; padding-right: 0; }
       <button class="chip" id="engineBtn" type="button" aria-haspopup="listbox" aria-expanded="false" title="Choose search engine (Ctrl+/)"></button>
       <ul id="dd" class="dd" role="listbox" aria-label="Search engines" hidden></ul>
     </div>
+    <button class="go" id="goBtn" type="button" disabled>Search</button>
   </div>
   <div class="actions">
     <button class="btn" id="addBtn" type="button">+ Link</button>
@@ -217,6 +235,7 @@ table.keys.sc td:last-child { text-align: right; padding-right: 0; }
     <button class="btn danger" type="button" id="resetBtn">Reset to defaults</button>
     <input type="file" id="importFile" accept="application/json,.json" hidden>
   </div>
+  <p class="err" id="dataErr" hidden></p>
   <p class="hint">Your data lives in this browser's local storage for this file. Clearing site data or moving the file can lose it, so export a backup now and then.</p>
 
   <h4>Keyboard shortcuts</h4>
@@ -232,6 +251,16 @@ table.keys.sc td:last-child { text-align: right; padding-right: 0; }
   </table>
 
   <div class="row end"><button type="button" class="btn primary" data-close>Close</button></div>
+</dialog>
+
+<!-- In-page confirmation (browser confirm() boxes are blocked in some viewers, so they are not used) -->
+<dialog id="askDlg">
+  <h3 id="askTitle">Are you sure?</h3>
+  <p id="askMsg"></p>
+  <div class="row end">
+    <button type="button" class="btn" id="askNo">Cancel</button>
+    <button type="button" class="btn danger" id="askYes">OK</button>
+  </div>
 </dialog>
 
 <script>
@@ -275,6 +304,10 @@ const DEFAULT_ENGINES = () => [
   { id: 'google', name: 'Google', url: 'https://www.google.com/search?q=%s' },
   { id: 'bing', name: 'Bing', url: 'https://www.bing.com/search?q=%s' },
   { id: 'ddg', name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=%s' },
+  { id: 'yahoo', name: 'Yahoo', url: 'https://search.yahoo.com/search?p=%s' },
+  { id: 'ecosia', name: 'Ecosia', url: 'https://www.ecosia.org/search?q=%s' },
+  { id: 'brave', name: 'Brave Search', url: 'https://search.brave.com/search?q=%s' },
+  { id: 'startpage', name: 'Startpage', url: 'https://www.startpage.com/do/search?q=%s' },
 ];
 
 /* Keyboard shortcuts: a combo is modifiers + one key, at most 3 keys in total. */
@@ -314,35 +347,24 @@ function defaultState() {
   const C = (name, links) => ({ id: uid(), name, links });
   return {
     categories: [
-      C('Search engines', [L('Google', 'https://www.google.com/'), L('Bing', 'https://www.bing.com/'), L('DuckDuckGo', 'https://duckduckgo.com/')]),
       C('Entertainment', [L('YouTube', 'https://www.youtube.com/')]),
-      C('LLM', [L('ChatGPT', 'https://chatgpt.com/'), L('Claude', 'https://claude.ai/'), L('Mistral', 'https://chat.mistral.ai/'), L('Gemini', 'https://gemini.google.com/'), L('Copilot', 'https://copilot.microsoft.com/')]),
-      C('Office', [
-        L('Word', 'https://www.office.com/launch/word'),
-        L('Excel', 'https://www.office.com/launch/excel'),
-        L('PowerPoint', 'https://www.office.com/launch/powerpoint'),
-        L('OneNote', 'https://www.office.com/launch/onenote'),
-        L('Outlook', 'https://outlook.office.com/'),
-        L('OneDrive', 'https://onedrive.live.com/'),
-        L('Teams', 'https://teams.microsoft.com/'),
-      ]),
-      C('Shopping', [L('Amazon', 'https://www.amazon.com/'), L('eBay', 'https://www.ebay.com/')]),
-      C('Dev', [L('GitHub', 'https://github.com/'), L('Stack Overflow', 'https://stackoverflow.com/')]),
+      C('Dev', [L('GitHub', 'https://github.com/')]),
+      C('Reference', [L('Wikipedia', 'https://www.wikipedia.org/')]),
     ],
-    settings: { newTab: true, icons: true, iconSource: 'google', theme: null, engine: 'google', engines: DEFAULT_ENGINES(), shortcuts: DEFAULT_SHORTCUTS(), migrated: ['llm-gemini-copilot'] },
+    settings: { newTab: true, icons: true, iconSource: 'google', theme: null, engine: 'google', mode: 'web', engines: DEFAULT_ENGINES(), shortcuts: DEFAULT_SHORTCUTS(), migrated: ['llm-gemini-copilot', 'engines-extra'] },
   };
 }
 
 /* One-time upgrades for dashboards saved by an older version of this file. */
 function migrate(s) {
   const done = s.settings.migrated;
-  if (!done.includes('llm-gemini-copilot')) {
-    let cat = s.categories.find((c) => c.name.toLowerCase() === 'llm');
-    if (!cat) { cat = { id: uid(), name: 'LLM', links: [] }; s.categories.push(cat); }
-    for (const [name, url] of [['Gemini', 'https://gemini.google.com/'], ['Copilot', 'https://copilot.microsoft.com/']]) {
-      if (!cat.links.some((l) => hostOf(l.url) === hostOf(url))) cat.links.push({ id: uid(), name, url });
+  if (!done.includes('engines-extra')) {
+    const host = (u) => { try { return new URL(u.replace('%s', 'x')).hostname.replace(/^www\./, ''); } catch (e) { return u; } };
+    for (const e of DEFAULT_ENGINES().slice(3)) {
+      const taken = s.settings.engines.some((x) => x.id === e.id || host(x.url) === host(e.url));
+      if (!taken) s.settings.engines.push(e);
     }
-    done.push('llm-gemini-copilot');
+    done.push('engines-extra');
   }
   return s;
 }
@@ -353,6 +375,7 @@ function sanitize(s) {
   const categories = s.categories.map((c) => ({
     id: String((c && c.id) || uid()),
     name: String((c && c.name) || 'Untitled').slice(0, 60),
+    collapsed: !!(c && c.collapsed),
     links: (c && Array.isArray(c.links) ? c.links : []).map((l) => {
       const url = normUrl(l && l.url);
       return url ? { id: String(l.id || uid()), name: String(l.name || hostOf(url)).slice(0, 60), url } : null;
@@ -366,6 +389,7 @@ function sanitize(s) {
   if (!engines.some((e) => e.id === st.engine)) st.engine = engines[0].id;
   st.theme = st.theme === 'dark' || st.theme === 'light' ? st.theme : null;
   st.newTab = !!st.newTab;
+  st.mode = st.mode === 'links' ? 'links' : 'web';   // last used search type; first run = web (Google)
   st.icons = !!st.icons;
   st.iconSource = st.iconSource === 'ddg' ? 'ddg' : 'google';
   const dsc = DEFAULT_SHORTCUTS(), sc = {};
@@ -405,14 +429,14 @@ let state = load();
 
 /* ---------- UI state ---------- */
 let editing = false;
-let mode = 'links';          // 'links' (filter local links) or 'web'
+let mode = state.settings.mode;          // 'links' (filter local links) or 'web'
 let query = '';
 let sel = 0;
 let selReset = true;
 let matches = [];            // [{link, el}] currently visible while filtering
 let ddOpen = false, ddIdx = 0;
 
-const q = $('#q'), modeBtn = $('#modeBtn'), engineBtn = $('#engineBtn'), dd = $('#dd'), search = $('#search');
+const q = $('#q'), modeBtn = $('#modeBtn'), engineBtn = $('#engineBtn'), dd = $('#dd'), search = $('#search'), goBtn = $('#goBtn');
 
 const engines = () => state.settings.engines;
 const currentEngine = () => engines().find((e) => e.id === state.settings.engine) || engines()[0];
@@ -451,13 +475,83 @@ function iconEl(link) {
   return img;
 }
 
+/* ---------- drag a link to another category (edit mode) ---------- */
+let drag = null;
+
+function wireDrop(section, catId) {
+  const clearBefore = () => document.querySelectorAll('.tile-wrap.before').forEach((x) => x.classList.remove('before'));
+  section.addEventListener('dragover', (e) => {
+    if (!drag) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const t = e.target.closest && e.target.closest('.tile-wrap');
+    clearBefore();
+    if (t && t.dataset.link !== drag.linkId) t.classList.add('before');
+    if (!section.classList.contains('drop')) {
+      document.querySelectorAll('.cat.drop').forEach((x) => x.classList.remove('drop'));
+      section.classList.add('drop');
+    }
+  });
+  section.addEventListener('dragleave', (e) => {
+    if (section.contains(e.relatedTarget)) return;
+    section.classList.remove('drop');
+    clearBefore();
+  });
+  section.addEventListener('drop', (e) => {
+    if (!drag) return;
+    e.preventDefault();
+    const t = e.target.closest && e.target.closest('.tile-wrap');
+    const id = drag.linkId;
+    drag = null;
+    document.querySelectorAll('.dragging, .drop, .before').forEach((x) => x.classList.remove('dragging', 'drop', 'before'));
+    moveLink(id, t ? t.dataset.link : null, catId);
+  });
+}
+
+// Drop on a tile = insert before it; drop anywhere else in a category = add to the end.
+function moveLink(linkId, beforeId, toCatId) {
+  let from = null, link = null, i = -1;
+  for (const c of state.categories) {
+    const k = c.links.findIndex((l) => l.id === linkId);
+    if (k >= 0) { from = c; link = c.links[k]; i = k; }
+  }
+  const to = state.categories.find((c) => c.id === toCatId);
+  if (!link || !to || linkId === beforeId) return;
+  from.links.splice(i, 1);
+  let j = beforeId ? to.links.findIndex((l) => l.id === beforeId) : -1;
+  if (j < 0) j = to.links.length;
+  to.links.splice(j, 0, link);
+  if (from === to && j === i) return;
+  save(); render();
+  if (from !== to) {
+    toast(`Moved "${link.name}" to "${to.name}"`, () => {
+      to.links.splice(to.links.indexOf(link), 1);
+      from.links.splice(Math.min(i, from.links.length), 0, link);
+      save(); render();
+    });
+  }
+}
+
 function tile(cat, link) {
   const a = h('a', {
     class: 'tile', href: link.url, title: link.url,
     target: state.settings.newTab ? '_blank' : '_self', rel: 'noopener noreferrer',
   }, iconEl(link), h('span', { class: 'name', text: link.name }));
   a.addEventListener('click', (e) => { if (editing) { e.preventDefault(); openLinkDlg(link.id); } });
-  const wrap = h('div', { class: 'tile-wrap' }, a);
+  const wrap = h('div', { class: 'tile-wrap', 'data-link': link.id }, a);
+  if (editing) {
+    a.draggable = true;
+    a.addEventListener('dragstart', (e) => {
+      drag = { linkId: link.id };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', link.name);
+      setTimeout(() => wrap.classList.add('dragging'), 0);
+    });
+    a.addEventListener('dragend', () => {
+      drag = null;
+      document.querySelectorAll('.dragging, .drop, .before').forEach((x) => x.classList.remove('dragging', 'drop', 'before'));
+    });
+  }
   if (editing) wrap.append(h('button', { class: 'x', type: 'button', title: 'Remove', 'aria-label': 'Remove ' + link.name, text: '\u00d7', onclick: () => removeLink(cat.id, link.id) }));
   return { wrap, a };
 }
@@ -476,7 +570,14 @@ function render() {
       : cat.links;
     if (filtering && !links.length) continue;
 
-    const head = h('div', { class: 'cat-head' }, h('h2', { text: cat.name }));
+    // A collapsed category is still shown expanded while filtering, so matches are never hidden.
+    const collapsed = !!cat.collapsed && !filtering;
+    const head = h('div', { class: 'cat-head' }, h('h2', {},
+      h('button', { class: 'cat-toggle', type: 'button', 'data-cat': cat.id, 'aria-expanded': String(!collapsed), disabled: filtering ? true : null,
+        title: collapsed ? 'Expand category' : 'Collapse category', onclick: () => toggleCat(cat.id) },
+        h('span', { class: 'chev', 'aria-hidden': 'true', text: collapsed ? '▶' : '▼' }),
+        h('span', { text: cat.name }),
+        collapsed && h('span', { class: 'count', text: `(${cat.links.length})` }))));
     if (editing) {
       head.append(h('div', { class: 'cat-tools' },
         h('button', { class: 'btn small', type: 'button', title: 'Move up', text: '\u2191', onclick: () => moveCat(cat.id, -1) }),
@@ -492,7 +593,9 @@ function render() {
     }
     if (editing && !filtering) grid.append(h('button', { class: 'add-tile', type: 'button', text: '+ Add link', onclick: () => openLinkDlg(null, cat.id) }));
     if (!links.length && !editing) grid.append(h('div', { class: 'empty', text: 'No links yet. Use Edit to add some.' }));
-    main.append(h('section', { class: 'cat' }, head, grid));
+    const section = h('section', { class: 'cat' }, head, collapsed ? null : grid);
+    if (editing) wireDrop(section, cat.id);
+    main.append(section);
   }
 
   if (!state.categories.length) {
@@ -500,6 +603,7 @@ function render() {
   } else if (filtering && !matches.length) {
     main.append(h('div', { class: 'empty', text: `No links match "${query.trim()}". Press ${fmtText(state.settings.shortcuts.mode)} to search the web instead.` }));
   }
+  if (editing && state.categories.length > 1) main.prepend(h('p', { class: 'hint', text: 'Drag a link onto another category to move it. Drop it on a link to place it before that one.' }));
   if (editing) main.append(h('div', { class: 'foot' }, h('button', { class: 'btn', type: 'button', text: '+ Add category', onclick: () => openCatDlg(null) })));
 
   if (selReset) {
@@ -510,6 +614,7 @@ function render() {
   }
   if (sel >= matches.length) sel = 0;
   paintSel();
+  updateGo();
 }
 
 function paintSel() {
@@ -528,16 +633,26 @@ function updateSearchUI() {
   const sc = state.settings.shortcuts;
   modeBtn.textContent = mode === 'links' ? 'Links' : 'Web';
   modeBtn.title = `Switch between link filter and web search (${fmtText(sc.mode)})`;
-  engineBtn.textContent = (mode === 'links' ? 'Local links' : eng.name) + ' \u25BE';
+  const curItem = mode === 'links' ? { id: '__local', name: 'Local links' } : eng;
+  engineBtn.replaceChildren(h('span', { class: 'dd-name' }, engineIcon(curItem), h('span', { text: curItem.name + ' \u25BE' })));
   engineBtn.title = `Choose search engine (${fmtText(sc.engines)})`;
   q.placeholder = mode === 'links' ? `Filter your links\u2026   ( ${fmtText(sc.focus)} to focus )` : `Search the web with ${eng.name}\u2026`;
   search.classList.toggle('web', mode === 'web');
+  updateGo();
+}
+
+// The button label follows the mode: "Search" for the web, "Go" to open the highlighted link.
+function updateGo() {
+  goBtn.textContent = mode === 'web' ? 'Search' : 'Go';
+  goBtn.disabled = !query.trim() || (mode === 'links' && !matches.length);
+  goBtn.title = (mode === 'web' ? `Search with ${currentEngine().name}` : 'Open the highlighted link') + ' (Enter). Shift+click: opposite tab behaviour';
 }
 
 function focusSearch() { q.focus(); q.select(); }
 
 function setMode(m) {
-  mode = m; selReset = true; updateSearchUI(); render();
+  mode = m; state.settings.mode = m; save();
+  selReset = true; updateSearchUI(); render();
 }
 function toggleMode() { setMode(mode === 'links' ? 'web' : 'links'); focusSearch(); }
 
@@ -550,7 +665,8 @@ function submitSearch(invert) {
   }
 }
 
-q.addEventListener('input', () => { query = q.value; selReset = true; if (mode === 'links') render(); });
+q.addEventListener('input', () => { query = q.value; selReset = true; if (mode === 'links') render(); else updateGo(); });
+goBtn.addEventListener('click', (e) => { submitSearch(e.shiftKey); });
 q.addEventListener('keydown', (e) => {
   if (e.isComposing) return;
   if (e.key === 'Enter') { e.preventDefault(); submitSearch(e.shiftKey); }
@@ -566,13 +682,18 @@ modeBtn.addEventListener('click', toggleMode);
 // The list holds "Local links" first, then the search engines.
 const ddItems = () => [{ id: '__local', name: 'Local links' }, ...engines()];
 const activeId = () => (mode === 'links' ? '__local' : currentEngine().id);
+// Same icon logic as the link tiles: the site's own icon when icons are on, otherwise a coloured letter.
+function engineIcon(item) {
+  if (item.id === '__local') return h('span', { class: 'letter local', 'aria-hidden': 'true', text: '⌂' });
+  return iconEl({ name: item.name, url: item.url });
+}
 function renderDropdown() {
   const cur = activeId();
   dd.replaceChildren(...ddItems().map((e, i) => h('li', {
     role: 'option', 'aria-selected': String(e.id === cur), class: (i === ddIdx ? 'hi ' : '') + (i === 0 ? 'sep' : ''),
     onmouseenter: () => { ddIdx = i; paintDropdown(); },
     onclick: () => chooseEngine(i),
-  }, h('span', { text: e.name }), h('span', { class: 'tick', text: e.id === cur ? '\u2713' : '' }))));
+  }, h('span', { class: 'dd-name' }, engineIcon(e), h('span', { text: e.name })), h('span', { class: 'tick', text: e.id === cur ? '\u2713' : '' }))));
 }
 function paintDropdown() { [...dd.children].forEach((li, i) => li.classList.toggle('hi', i === ddIdx)); }
 function openDropdown() {
@@ -635,7 +756,7 @@ let toastTimer;
 function hideToast() { clearTimeout(toastTimer); $('#toast').hidden = true; }
 function toast(msg, undo) {
   const t = $('#toast');
-  t.replaceChildren(h('span', { text: msg }), undo && h('button', { type: 'button', text: 'Undo', onclick: () => { undo(); hideToast(); } }));
+  t.replaceChildren(...[h('span', { text: msg }), undo && h('button', { type: 'button', text: 'Undo', onclick: () => { undo(); hideToast(); } })].filter(Boolean));
   t.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(hideToast, 7000);
@@ -654,6 +775,13 @@ function removeCat(catId) {
   const [cat] = state.categories.splice(i, 1);
   save(); render();
   toast(`Deleted category "${cat.name}"`, () => { state.categories.splice(Math.min(i, state.categories.length), 0, cat); save(); render(); });
+}
+function toggleCat(catId) {
+  const cat = state.categories.find((c) => c.id === catId);
+  cat.collapsed = !cat.collapsed;
+  save(); render();
+  const btn = document.querySelector(`[data-cat="${catId}"]`);
+  if (btn) btn.focus();
 }
 function moveCat(catId, d) {
   const i = state.categories.findIndex((c) => c.id === catId), j = i + d;
@@ -712,6 +840,7 @@ $('#linkForm').addEventListener('submit', (e) => {
     link.name = name; link.url = url;
     if (oldCat !== cat) { oldCat.links = oldCat.links.filter((x) => x !== link); cat.links.push(link); }
   } else cat.links.push({ id: uid(), name, url });
+  cat.collapsed = false;   // show the category the link was just added to
   save(); render(); linkDlg.close();
 });
 
@@ -821,8 +950,8 @@ $('#resetScBtn').addEventListener('click', () => {
 
 $('#setBtn').addEventListener('click', () => { syncSettingsUI(); setDlg.showModal(); });
 $('#sNewTab').addEventListener('change', (e) => { state.settings.newTab = e.target.value === '1'; save(); render(); });
-$('#sIcons').addEventListener('change', (e) => { state.settings.icons = e.target.checked; $('#sIconSrc').disabled = !e.target.checked; save(); render(); });
-$('#sIconSrc').addEventListener('change', (e) => { state.settings.iconSource = e.target.value; save(); render(); });
+$('#sIcons').addEventListener('change', (e) => { state.settings.icons = e.target.checked; $('#sIconSrc').disabled = !e.target.checked; save(); render(); updateSearchUI(); });
+$('#sIconSrc').addEventListener('change', (e) => { state.settings.iconSource = e.target.value; save(); render(); updateSearchUI(); });
 
 $('#engForm').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -844,16 +973,39 @@ $('#importFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f) return;
-  try {
-    const next = sanitize(JSON.parse(await f.text()));
-    if (!confirm('Replace your current dashboard with the contents of this file?')) return;
-    state = next; save(); refreshAll(); syncSettingsUI();
-  } catch (err) { alert('Import failed: ' + err.message); }
+  const err = $('#dataErr');
+  err.hidden = true;
+  let next;
+  try { next = sanitize(JSON.parse(await f.text())); }
+  catch (e2) { err.textContent = 'Import failed: ' + (e2 instanceof SyntaxError ? 'this file is not valid JSON.' : e2.message); err.hidden = false; return; }
+  if (!(await ask('Import this backup?', 'This replaces all your current links, categories and settings with the contents of the file.', 'Import'))) return;
+  state = next; save(); refreshAll(); syncSettingsUI();
+  setDlg.close();
+  toast('Backup imported');
 });
-$('#resetBtn').addEventListener('click', () => {
-  if (!confirm('Reset everything to the default links and settings? This cannot be undone.')) return;
+$('#resetBtn').addEventListener('click', async () => {
+  if (!(await ask('Reset to defaults?', 'This replaces all your links, categories and settings with the defaults. It cannot be undone.', 'Reset'))) return;
+  $('#dataErr').hidden = true;
   state = defaultState(); save(); refreshAll(); syncSettingsUI();
+  setDlg.close();
+  toast('Reset to defaults');
 });
+
+/* ---------- in-page confirmation dialog ---------- */
+const askDlg = $('#askDlg');
+function ask(title, message, okLabel) {
+  return new Promise((resolve) => {
+    $('#askTitle').textContent = title;
+    $('#askMsg').textContent = message;
+    $('#askYes').textContent = okLabel || 'OK';
+    let result = false;
+    $('#askYes').onclick = () => { result = true; askDlg.close(); };
+    $('#askNo').onclick = () => askDlg.close();
+    askDlg.addEventListener('close', () => resolve(result), { once: true });   // Esc also lands here, as "no"
+    askDlg.showModal();
+    $('#askNo').focus();
+  });
+}
 
 /* ---------- dialogs: generic close buttons ---------- */
 document.addEventListener('click', (e) => {
@@ -862,7 +1014,7 @@ document.addEventListener('click', (e) => {
 });
 
 /* ---------- init ---------- */
-function refreshAll() { applyTheme(); updateSearchUI(); selReset = true; render(); }
+function refreshAll() { mode = state.settings.mode; applyTheme(); updateSearchUI(); selReset = true; render(); }
 window.addEventListener('storage', (e) => { if (e.key === KEY) { state = load(); refreshAll(); } });
 
 save();
